@@ -64,24 +64,29 @@
         const totalDays = Math.floor((deadlineDate - today) / msPerDay);
 
         if (totalDays < 0) {
-            return { months: 0, weeks: 0, days: 0 }; // เลยเวลาแล้ว
+            return { months: 0, weeks: 0, days: 0, isExpired: true };
         }
 
         const weeks = Math.floor(totalDays / 7);
         const days = totalDays % 7;
 
+        let months = null;
         if (totalDays >= 30) {
-            let months = (deadlineDate.getFullYear() - today.getFullYear()) * 12 +
-                        (deadlineDate.getMonth() - today.getMonth());
+            months = (deadlineDate.getFullYear() - today.getFullYear()) * 12 +
+                    (deadlineDate.getMonth() - today.getMonth());
             if (deadlineDate.getDate() < today.getDate()) {
                 months--;
             }
-
-            return { months, weeks, days };
         }
 
-        return { months: null, weeks, days };
+        return {
+            months,
+            weeks,
+            days,
+            isExpired: false
+        };
     }
+
 
 
     function getProgressBadge(progress, timeLeft) {
@@ -89,7 +94,10 @@
             return '<span class="badge badge-success">สำเร็จแล้ว</span>';
         }
 
-        // เช็กว่าใกล้หมดเวลา (เหลือเดือนเดียวหรือน้อยกว่า)
+        if (timeLeft.isExpired) {
+            return '<span class="badge badge-dark">สิ้นสุดแล้ว</span>';
+        }
+
         if (timeLeft.months !== null && timeLeft.months <= 1) {
             return '<span class="badge badge-danger">ใกล้หมดเวลา</span>';
         }
@@ -104,7 +112,6 @@
 
         return '<span class="badge badge-outline">เริ่มต้น</span>';
     }
-
 
     // MODIFIED: Auth Functions
     function initAuthPage() {
@@ -297,62 +304,64 @@
     // I am including all of them here for completeness.
     
     // Dashboard Functions
-function renderDashboard() {
-    const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-    const balance = totalIncome - totalExpense;
+    function renderDashboard() {
+        const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+        const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+        const balance = totalIncome - totalExpense;
 
-    return `
-        <div class="space-y-4">
-            <div>
-                <h1>สวัสดี! ยินดีต้อนรับสู่แดชบอร์ดการเงิน</h1>
-                <p style="color: #6b7280; margin-top: 0.5rem;">ภาพรวมสถานะการเงินของคุณ</p>
-            </div>
+        return `
+            <div class="space-y-4">
+                <div>
+                    <h1>สวัสดี! ยินดีต้อนรับสู่แดชบอร์ดการเงิน</h1>
+                    <p style="color: #6b7280; margin-top: 0.5rem;">ภาพรวมสถานะการเงินของคุณ</p>
+                </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="stat-card">
-                    <div class="stat-value">${formatCurrency(balance)} ฿</div>
-                    <div class="stat-label">ยอดคงเหลือ</div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="stat-card">
+                        <div class="stat-value">${formatCurrency(balance)} ฿</div>
+                        <div class="stat-label">ยอดคงเหลือ</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value stat-positive">+${formatCurrency(totalIncome)} ฿</div>
+                        <div class="stat-label">รายรับทั้งหมด</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value stat-negative">-${formatCurrency(totalExpense)} ฿</div>
+                        <div class="stat-label">รายจ่ายทั้งหมด</div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value stat-positive">+${formatCurrency(totalIncome)} ฿</div>
-                    <div class="stat-label">รายรับทั้งหมด</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value stat-negative">-${formatCurrency(totalExpense)} ฿</div>
-                    <div class="stat-label">รายจ่ายทั้งหมด</div>
-                </div>
-            </div>
 
-            <div class="card">
-                <div class="card-header"><div class="card-title">🎯เป้าหมายการออม</div></div>
-                <div class="card-content">
-                    ${goals.length > 0 ? `
-                        <div class="mt-2 space-y-3">
-                            ${goals.map(goal => {
-                                const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
-                                return `
-                                    <div class="goal-item">
-                                        <div class="flex justify-between items-center">
-                                            <span style="font-weight: 500;">${goal.title}</span>
-                                            <span style="font-size: 0.85rem;">${formatCurrency(goal.currentAmount)} / ${formatCurrency(goal.targetAmount)} ฿</span>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">🎯 เป้าหมายการออม</div></div>
+                    <div class="card-content">
+                        ${goals.length > 0 ? `
+                            <div class="mt-2 space-y-3">
+                                ${goals.map(goal => {
+                                    const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+                                    const timeLeft = calculateMonthsLeft(goal.deadline); // ✅ ถูกต้อง อยู่ใน map()
+
+                                    return `
+                                        <div class="goal-item">
+                                            <div class="flex justify-between items-center">
+                                                <span style="font-weight: 500;">${goal.title}</span>
+                                                <span style="font-size: 0.85rem;">${formatCurrency(goal.currentAmount)} / ${formatCurrency(goal.targetAmount)} ฿</span>
+                                            </div>
+                                            <div class="progress-bar small-bar">
+                                                <div class="progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
+                                            </div>
+                                            <div class="flex justify-between" style="font-size: 0.75rem; color: #6b7280;">
+                                                <span>${progress.toFixed(1)}%</span>
+                                                ${getProgressBadge(progress, timeLeft)} <!-- ✅ ใช้ timeLeft -->
+                                            </div>
                                         </div>
-                                        <div class="progress-bar small-bar">
-                                            <div class="progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
-                                        </div>
-                                        <div class="flex justify-between" style="font-size: 0.75rem; color: #6b7280;">
-                                            <span>${progress.toFixed(1)}%</span>
-                                            ${getProgressBadge(progress, Infinity)}
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    ` : `<p style="color: #6b7280; margin-top: 1rem;">ยังไม่มีเป้าหมายออมเงิน</p>`}
+                                    `;
+                                }).join('')}
+                            </div>
+                        ` : `<p class="text-center text-gray-500">ยังไม่มีเป้าหมาย</p>`}
+                    </div>
                 </div>
-            </div>
-        </div>`;
-}
+            </div>`;
+    }
 
 
 
@@ -505,31 +514,39 @@ function renderDashboard() {
         }
 
         return goals.map(goal => {
-            const progress = (goal.targetAmount > 0) ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
-            const timeLeft = calculateMonthsLeft(goal.deadline); // ✅ object { months, weeks, days }
+            const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+            const timeLeft = calculateMonthsLeft(goal.deadline);
             const remainingAmount = goal.targetAmount - goal.currentAmount;
 
             let timeLeftText = '';
             let savePerText = '';
             let monthlyTarget = 0, weeklyTarget = 0, dailyTarget = 0;
 
-            if (timeLeft.months !== null) {
-                const totalWeeks = timeLeft.months * 4 + timeLeft.weeks;
-                const totalDays = timeLeft.months * 30 + timeLeft.weeks * 7 + timeLeft.days;
+            // เช็กว่าหมดเวลาแล้วหรือยัง
+            const isExpired = timeLeft.days === 0 && progress < 100;
 
-                monthlyTarget = remainingAmount > 0 ? remainingAmount / timeLeft.months : 0;
-                weeklyTarget = totalWeeks > 0 && remainingAmount > 0 ? remainingAmount / totalWeeks : 0;
-                dailyTarget = totalDays > 0 && remainingAmount > 0 ? remainingAmount / totalDays : 0;
+            if (!isExpired) {
+                if (timeLeft.months !== null) {
+                    const totalWeeks = timeLeft.months * 4 + timeLeft.weeks;
+                    const totalDays = timeLeft.months * 30 + timeLeft.weeks * 7 + timeLeft.days;
 
-                timeLeftText = `${timeLeft.months} เดือน<br>${timeLeft.weeks} สัปดาห์<br>${timeLeft.days} วัน`;
-                savePerText = `${formatCurrency(monthlyTarget)} ฿/เดือน<br>${formatCurrency(weeklyTarget)} ฿/สัปดาห์<br>${formatCurrency(dailyTarget)} ฿/วัน`;
+                    monthlyTarget = remainingAmount > 0 ? remainingAmount / timeLeft.months : 0;
+                    weeklyTarget = totalWeeks > 0 && remainingAmount > 0 ? remainingAmount / totalWeeks : 0;
+                    dailyTarget = totalDays > 0 && remainingAmount > 0 ? remainingAmount / totalDays : 0;
+
+                    timeLeftText = `${timeLeft.months} เดือน<br>${timeLeft.weeks} สัปดาห์<br>${timeLeft.days} วัน`;
+                    savePerText = `${formatCurrency(monthlyTarget)} ฿/เดือน<br>${formatCurrency(weeklyTarget)} ฿/สัปดาห์<br>${formatCurrency(dailyTarget)} ฿/วัน`;
+                } else {
+                    const totalDays = timeLeft.weeks * 7 + timeLeft.days;
+                    weeklyTarget = timeLeft.weeks > 0 && remainingAmount > 0 ? remainingAmount / timeLeft.weeks : 0;
+                    dailyTarget = totalDays > 0 && remainingAmount > 0 ? remainingAmount / totalDays : 0;
+
+                    timeLeftText = `${timeLeft.weeks} สัปดาห์<br>${timeLeft.days} วัน`;
+                    savePerText = `${formatCurrency(weeklyTarget)} ฿/สัปดาห์<br>${formatCurrency(dailyTarget)} ฿/วัน`;
+                }
             } else {
-                const totalDays = timeLeft.weeks * 7 + timeLeft.days;
-                weeklyTarget = timeLeft.weeks > 0 && remainingAmount > 0 ? remainingAmount / timeLeft.weeks : 0;
-                dailyTarget = totalDays > 0 && remainingAmount > 0 ? remainingAmount / totalDays : 0;
-
-                timeLeftText = `${timeLeft.weeks} สัปดาห์<br>${timeLeft.days} วัน`;
-                savePerText = `${formatCurrency(weeklyTarget)} ฿/สัปดาห์<br>${formatCurrency(dailyTarget)} ฿/วัน`;
+                timeLeftText = `<span class="text-red-600">หมดเวลาตามกำหนด</span>`;
+                savePerText = `<span class="text-gray-500">-</span>`;
             }
 
             return `
@@ -581,6 +598,7 @@ function renderDashboard() {
                 </div>`;
         }).join('');
     }
+
 
     function initGoalsPage() {
         const formCard = document.getElementById('goal-form-card');

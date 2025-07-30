@@ -404,6 +404,11 @@
             color: #374151;
         }
 
+        .badge-dark{
+            background-color: #111827;
+            color: white;
+        }
+
         /* Tabs */
         .tabs {
             margin-bottom: 2rem;
@@ -676,3 +681,4 @@
                 grid-template-columns: repeat(1, 1fr);
             }
         }
+      
