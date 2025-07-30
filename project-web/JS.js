@@ -52,24 +52,59 @@
     function formatDate(dateString) {
         return new Date(dateString).toLocaleDateString('th-TH');
     }
+
     function calculateMonthsLeft(deadline) {
         const today = new Date();
         const deadlineDate = new Date(deadline);
-        if (deadlineDate < today) return 0;
-        const diffTime = deadlineDate.getTime() - today.getTime();
-        const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        if (daysLeft < 30) return 0;
-        return Math.ceil(daysLeft / 30.44);  // ถ้าเกิน 1 เดือนค่อยปัดขึ้น
+        today.setHours(0, 0, 0, 0);
+        deadlineDate.setHours(0, 0, 0, 0);
+
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const totalDays = Math.floor((deadlineDate - today) / msPerDay);
+
+        if (totalDays < 0) {
+            return { months: 0, weeks: 0, days: 0 }; // เลยเวลาแล้ว
+        }
+
+        const weeks = Math.floor(totalDays / 7);
+        const days = totalDays % 7;
+
+        if (totalDays >= 30) {
+            let months = (deadlineDate.getFullYear() - today.getFullYear()) * 12 +
+                        (deadlineDate.getMonth() - today.getMonth());
+            if (deadlineDate.getDate() < today.getDate()) {
+                months--;
+            }
+
+            return { months, weeks, days };
+        }
+
+        return { months: null, weeks, days };
     }
 
-    function getProgressBadge(progress, monthsLeft) {
-        if (progress >= 100) return '<span class="badge badge-success">สำเร็จแล้ว</span>';
-        if (monthsLeft <= 1) return '<span class="badge badge-danger">ใกล้หมดเวลา</span>';
-        if (progress >= 75) return '<span class="badge badge-primary">เกือบถึงเป้า</span>';
-        if (progress >= 50) return '<span class="badge badge-secondary">กำลังดำเนินการ</span>';
+
+    function getProgressBadge(progress, timeLeft) {
+        if (progress >= 100) {
+            return '<span class="badge badge-success">สำเร็จแล้ว</span>';
+        }
+
+        // เช็กว่าใกล้หมดเวลา (เหลือเดือนเดียวหรือน้อยกว่า)
+        if (timeLeft.months !== null && timeLeft.months <= 1) {
+            return '<span class="badge badge-danger">ใกล้หมดเวลา</span>';
+        }
+
+        if (progress >= 75) {
+            return '<span class="badge badge-primary">เกือบถึงเป้า</span>';
+        }
+
+        if (progress >= 50) {
+            return '<span class="badge badge-secondary">กำลังดำเนินการ</span>';
+        }
+
         return '<span class="badge badge-outline">เริ่มต้น</span>';
     }
+
 
     // MODIFIED: Auth Functions
     function initAuthPage() {
@@ -262,54 +297,64 @@
     // I am including all of them here for completeness.
     
     // Dashboard Functions
-    function renderDashboard() {
-        const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-        const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-        const currentSavings = goals.reduce((sum, g) => sum + g.currentAmount, 0);
-        const savingsGoal = goals.reduce((sum, g) => sum + g.targetAmount, 0);
-        const balance = totalIncome - totalExpense; // More accurate balance
-        const netIncome = totalIncome - totalExpense;
-        const recommendedSavings = totalIncome * 0.2;
-        const savingsProgress = savingsGoal > 0 ? (currentSavings / savingsGoal) * 100 : 0;
+function renderDashboard() {
+    const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const balance = totalIncome - totalExpense;
+
+    return `
+        <div class="space-y-4">
+            <div>
+                <h1>สวัสดี! ยินดีต้อนรับสู่แดชบอร์ดการเงิน</h1>
+                <p style="color: #6b7280; margin-top: 0.5rem;">ภาพรวมสถานะการเงินของคุณ</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="stat-card">
+                    <div class="stat-value">${formatCurrency(balance)} ฿</div>
+                    <div class="stat-label">ยอดคงเหลือ</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value stat-positive">+${formatCurrency(totalIncome)} ฿</div>
+                    <div class="stat-label">รายรับทั้งหมด</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value stat-negative">-${formatCurrency(totalExpense)} ฿</div>
+                    <div class="stat-label">รายจ่ายทั้งหมด</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">🎯เป้าหมายการออม</div></div>
+                <div class="card-content">
+                    ${goals.length > 0 ? `
+                        <div class="mt-2 space-y-3">
+                            ${goals.map(goal => {
+                                const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+                                return `
+                                    <div class="goal-item">
+                                        <div class="flex justify-between items-center">
+                                            <span style="font-weight: 500;">${goal.title}</span>
+                                            <span style="font-size: 0.85rem;">${formatCurrency(goal.currentAmount)} / ${formatCurrency(goal.targetAmount)} ฿</span>
+                                        </div>
+                                        <div class="progress-bar small-bar">
+                                            <div class="progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
+                                        </div>
+                                        <div class="flex justify-between" style="font-size: 0.75rem; color: #6b7280;">
+                                            <span>${progress.toFixed(1)}%</span>
+                                            ${getProgressBadge(progress, Infinity)}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    ` : `<p style="color: #6b7280; margin-top: 1rem;">ยังไม่มีเป้าหมายออมเงิน</p>`}
+                </div>
+            </div>
+        </div>`;
+}
 
 
-        return `
-            <div class="space-y-4">
-                <div>
-                    <h1>สวัสดี! ยินดีต้อนรับสู่แดชบอร์ดการเงิน</h1>
-                    <p style="color: #6b7280; margin-top: 0.5rem;">ภาพรวมสถานะการเงินของคุณ</p>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="stat-card">
-                        <div class="stat-value">${formatCurrency(balance)} ฿</div>
-                        <div class="stat-label">ยอดคงเหลือ</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value stat-positive">+${formatCurrency(totalIncome)} ฿</div>
-                        <div class="stat-label">รายรับเดือนนี้</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value stat-negative">-${formatCurrency(totalExpense)} ฿</div>
-                        <div class="stat-label">รายจ่ายเดือนนี้</div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><div class="card-title">เป้าหมายการออม</div></div>
-                    <div class="card-content">
-                        <div class="flex justify-between mb-2">
-                            <span>ความคืบหน้า</span>
-                            <span>${formatCurrency(currentSavings)} / ${formatCurrency(savingsGoal)} ฿</span>
-                        </div>
-                        <div class="progress-bar"><div class="progress-fill" style="width: ${Math.min(savingsProgress, 100)}%"></div></div>
-                        <div class="flex justify-between mt-2" style="font-size: 0.875rem; color: #6b7280;">
-                            <span>${savingsProgress.toFixed(1)}% เสร็จสิ้น</span>
-                            <span class="badge ${savingsProgress >= 75 ? 'badge-primary' : 'badge-secondary'}">
-                                ${savingsProgress >= 75 ? 'ใกล้ถึงเป้าหมาย' : 'ยังไม่ถึงเป้าหมาย'}
-                            </span>
-                        </div>
-                    </div>
-                </div>`;
-    }
 
     // Transactions Functions
     function renderTransactionsPage() {
@@ -451,95 +496,91 @@
 
     // ...existing code...
     function renderGoalsList() {
-    if (goals.length === 0) return `<div class="card" style="grid-column: 1 / -1;"><div class="card-content text-center py-8"><p style="color: #6b7280;">ยังไม่มีเป้าหมาย</p></div></div>`;
-    
-    return goals.map(goal => {
-        const progress = (goal.targetAmount > 0) ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
-        const monthsLeft = calculateMonthsLeft(goal.deadline);
-        const remainingAmount = goal.targetAmount - goal.currentAmount;
-
-        // --- คำนวณวันและสัปดาห์ที่เหลือ ---
-        const today = new Date();
-        const deadlineDate = new Date(goal.deadline);
-        let daysLeft = Math.ceil((deadlineDate - today) / (1000 * 60 * 60 * 24));
-        daysLeft = daysLeft < 0 ? 0 : daysLeft;
-        let weeksLeft = Math.ceil(daysLeft / 7);
-
-        // --- เงื่อนไข: ถ้าเหลือไม่ถึง 1 เดือน ไม่ต้องแสดงเดือน ---
-        let timeLeftText = '';
-        let savePerText = '';
-        let monthlyTarget = 0, weeklyTarget = 0, dailyTarget = 0;
-
-        if (monthsLeft >= 1 ) {
-            monthlyTarget = (monthsLeft > 0 && remainingAmount > 0) ? remainingAmount / monthsLeft : 0;
-            weeklyTarget = (weeksLeft > 0 && remainingAmount > 0) ? remainingAmount / weeksLeft : 0;
-            dailyTarget = (daysLeft > 0 && remainingAmount > 0) ? remainingAmount / daysLeft : 0;
-            timeLeftText = `${monthsLeft} เดือน<br>${weeksLeft} สัปดาห์<br>${daysLeft} วัน`;
-            savePerText = `${formatCurrency(monthlyTarget)} ฿/เดือน<br>${formatCurrency(weeklyTarget)} ฿/สัปดาห์<br>${formatCurrency(dailyTarget)} ฿/วัน`;
-        } else if (weeksLeft >= 1) {
-            weeklyTarget = (weeksLeft > 0 && remainingAmount > 0) ? remainingAmount / weeksLeft : 0;
-            dailyTarget = (daysLeft > 0 && remainingAmount > 0) ? remainingAmount / daysLeft : 0;
-            timeLeftText = `${weeksLeft} สัปดาห์<br>${daysLeft} วัน`;
-            savePerText = `${formatCurrency(weeklyTarget)} ฿/สัปดาห์<br>${formatCurrency(dailyTarget)} ฿/วัน`;
-        } else {
-            dailyTarget = (daysLeft > 0 && remainingAmount > 0) ? remainingAmount / daysLeft : 0;
-            timeLeftText = `${daysLeft} วัน`;
-            savePerText = `${formatCurrency(dailyTarget)} ฿/วัน`;
-        }
-
-        return `
-            <div class="goal-card" data-id="${goal.id}">
-                <div class="goal-header">
-                    <div>
-                        <div class="goal-title">${goal.title}</div>
-                        <div class="goal-category">${goal.category}</div>
-                    </div>
-                    <div class="goal-actions">
-                        ${getProgressBadge(progress, monthsLeft)}
-                        <button class="btn btn-danger btn-small delete-goal-btn">ลบ</button>
-                    </div>
-                </div>
-                <div class="goal-progress">
-                    <div class="goal-progress-text">
-                        <span>ความคืบหน้า</span>
-                        <span>${formatCurrency(goal.currentAmount)} / ${formatCurrency(goal.targetAmount)} ฿</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
-                    </div>
-                    <div class="goal-progress-details">
-                        <span>${progress.toFixed(1)}%</span>
-                        <span>เหลือ ${formatCurrency(remainingAmount)} ฿</span>
-                    </div>
-                </div>
-                <div class="goal-stats">
-                    <div>
-                        <div class="goal-stat-label">เวลาเหลือ</div>
-                        <div>
-                            ${timeLeftText}
-                        </div>
-                    </div>
-                    <div>
-                        <div class="goal-stat-label">ออมต่อช่วงเวลา</div>
-                        <div>
-                            ${savePerText}
-                        </div>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2 mb-4">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: #6b7280;">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                    <span style="font-size: 0.875rem; color: #6b7280;">ถึง ${formatDate(goal.deadline)}</span>
-                </div>
-                ${goal.description ? `<p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 1rem;">${goal.description}</p>` : ''}
-                <div class="flex gap-2">
-                    <input type="number" class="form-input update-amount-input" placeholder="อัปเดตยอดเงินออม" style="flex: 1;">
-                    <button class="btn btn-primary btn-small update-goal-btn">อัปเดต</button>
+        if (goals.length === 0) {
+            return `<div class="card" style="grid-column: 1 / -1;">
+                <div class="card-content text-center py-8">
+                    <p style="color: #6b7280;">ยังไม่มีเป้าหมาย</p>
                 </div>
             </div>`;
-    }).join('');
-}
+        }
+
+        return goals.map(goal => {
+            const progress = (goal.targetAmount > 0) ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+            const timeLeft = calculateMonthsLeft(goal.deadline); // ✅ object { months, weeks, days }
+            const remainingAmount = goal.targetAmount - goal.currentAmount;
+
+            let timeLeftText = '';
+            let savePerText = '';
+            let monthlyTarget = 0, weeklyTarget = 0, dailyTarget = 0;
+
+            if (timeLeft.months !== null) {
+                const totalWeeks = timeLeft.months * 4 + timeLeft.weeks;
+                const totalDays = timeLeft.months * 30 + timeLeft.weeks * 7 + timeLeft.days;
+
+                monthlyTarget = remainingAmount > 0 ? remainingAmount / timeLeft.months : 0;
+                weeklyTarget = totalWeeks > 0 && remainingAmount > 0 ? remainingAmount / totalWeeks : 0;
+                dailyTarget = totalDays > 0 && remainingAmount > 0 ? remainingAmount / totalDays : 0;
+
+                timeLeftText = `${timeLeft.months} เดือน<br>${timeLeft.weeks} สัปดาห์<br>${timeLeft.days} วัน`;
+                savePerText = `${formatCurrency(monthlyTarget)} ฿/เดือน<br>${formatCurrency(weeklyTarget)} ฿/สัปดาห์<br>${formatCurrency(dailyTarget)} ฿/วัน`;
+            } else {
+                const totalDays = timeLeft.weeks * 7 + timeLeft.days;
+                weeklyTarget = timeLeft.weeks > 0 && remainingAmount > 0 ? remainingAmount / timeLeft.weeks : 0;
+                dailyTarget = totalDays > 0 && remainingAmount > 0 ? remainingAmount / totalDays : 0;
+
+                timeLeftText = `${timeLeft.weeks} สัปดาห์<br>${timeLeft.days} วัน`;
+                savePerText = `${formatCurrency(weeklyTarget)} ฿/สัปดาห์<br>${formatCurrency(dailyTarget)} ฿/วัน`;
+            }
+
+            return `
+                <div class="goal-card" data-id="${goal.id}">
+                    <div class="goal-header">
+                        <div>
+                            <div class="goal-title">${goal.title}</div>
+                            <div class="goal-category">${goal.category}</div>
+                        </div>
+                        <div class="goal-actions">
+                            ${getProgressBadge(progress, timeLeft)}
+                            <button class="btn btn-danger btn-small delete-goal-btn">ลบ</button>
+                        </div>
+                    </div>
+                    <div class="goal-progress">
+                        <div class="goal-progress-text">
+                            <span>ความคืบหน้า</span>
+                            <span>${formatCurrency(goal.currentAmount)} / ${formatCurrency(goal.targetAmount)} ฿</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
+                        </div>
+                        <div class="goal-progress-details">
+                            <span>${progress.toFixed(1)}%</span>
+                            <span>เหลือ ${formatCurrency(remainingAmount)} ฿</span>
+                        </div>
+                    </div>
+                    <div class="goal-stats">
+                        <div>
+                            <div class="goal-stat-label">เวลาเหลือ</div>
+                            <div>${timeLeftText}</div>
+                        </div>
+                        <div>
+                            <div class="goal-stat-label">ออมต่อช่วงเวลา</div>
+                            <div>${savePerText}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 mb-4">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: #6b7280;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span style="font-size: 0.875rem; color: #6b7280;">ถึง ${formatDate(goal.deadline)}</span>
+                    </div>
+                    ${goal.description ? `<p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 1rem;">${goal.description}</p>` : ''}
+                    <div class="flex gap-2">
+                        <input type="number" class="form-input update-amount-input" placeholder="อัปเดตยอดเงินออม" style="flex: 1;">
+                        <button class="btn btn-primary btn-small update-goal-btn">อัปเดต</button>
+                    </div>
+                </div>`;
+        }).join('');
+    }
 
     function initGoalsPage() {
         const formCard = document.getElementById('goal-form-card');
