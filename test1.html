@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ผู้ช่วยวางแผนการออมเงินและลงทุน</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="./JS.js" type="module"></script>
+    <link rel="stylesheet" href="styletest.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Auth Page -->
+        <div id="auth-page" class="auth-container">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <h1>ผู้ช่วยวางแผนการออมเงิน</h1>
+                    <p>เริ่มต้นวางแผนการเงินของคุณ</p>
+                </div>
+                
+                <div class="auth-tabs">
+                    <div class="auth-tab active" data-tab="login">เข้าสู่ระบบ</div>
+                    <div class="auth-tab" data-tab="register">สมัครสมาชิก</div>
+                </div>
+                
+                <form id="login-form" class="auth-form active">
+                    <div class="form-group">
+                        <label class="form-label">อีเมล</label>
+                        <input type="email" class="form-input" name="email" placeholder="your@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">รหัสผ่าน</label>
+                        <input type="password" class="form-input" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">เข้าสู่ระบบ</button>
+                </form>
+                
+                <form id="register-form" class="auth-form">
+                    <div class="form-group">
+                        <label class="form-label">ชื่อ</label>
+                        <input type="text" class="form-input" name="name" placeholder="ชื่อของคุณ" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">อีเมล</label>
+                        <input type="email" class="form-input" name="email" placeholder="your@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">รหัสผ่าน</label>
+                        <input type="password" class="form-input" name="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">ยืนยันรหัสผ่าน</label>
+                        <input type="password" class="form-input" name="confirmPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">สมัครสมาชิก</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="main-app" class="container" style="display: none;">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2 id="user-name">สวัสดี, ผู้ใช้</h2>
+                    <p id="user-email">user@example.com</p>
+                </div>
+                
+                <div class="sidebar-nav">
+                    <a href="#" class="nav-item active" data-page="dashboard">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z"></path>
+                        </svg>
+                        หน้าหลัก
+                    </a>
+                    
+                    <a href="#" class="nav-item" data-page="transactions">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        บันทึกรายการ
+                    </a>
+                    
+                    <a href="#" class="nav-item" data-page="goals">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        เป้าหมาย
+                    </a>
+                    
+                    <a href="#" class="nav-item" data-page="progress">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        ติดตามผล
+                    </a>
+                    
+                    <div class="nav-logout">
+                        <a href="#" class="nav-item" id="logout-btn">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                            ออกจากระบบ
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="main-content">
+                <div id="content-area">
+                    <!-- Content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
