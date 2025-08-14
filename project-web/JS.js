@@ -168,40 +168,62 @@
 
     // MODIFIED: Show Main App Logic
     async function showMainApp(user) {
-        document.getElementById('auth-page').style.display = 'none';
-        document.getElementById('main-app').style.display = 'flex';
+    const authPage = document.getElementById('auth-page');
+    const mainApp  = document.getElementById('main-app');
+    if (!authPage || !mainApp) return;     // กัน null
 
-        // Fetch user data from Firestore
+    authPage.style.display = 'none';
+    mainApp.style.display  = 'flex';
+
+    try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-            currentUser = { uid: user.uid, ...userDoc.data() };
-        } else {
-             currentUser = { uid: user.uid, name: 'ผู้ใช้งาน', email: user.email };
-        }
+        currentUser = userDoc.exists()
+        ? { uid: user.uid, ...userDoc.data() }
+        : { uid: user.uid, name: 'ผู้ใช้งาน', email: user.email };
+    } catch (err) {
+        console.error('get user doc error:', err);
+        currentUser = { uid: user.uid, name: 'ผู้ใช้งาน', email: user.email };
+    }
 
-        document.getElementById('user-name').textContent = `สวัสดี, ${currentUser.name}`;
-        document.getElementById('user-email').textContent = currentUser.email;
+    const nameEl = document.getElementById('user-name');
+    const emailEl = document.getElementById('user-email');
+    if (nameEl)  nameEl.textContent  = `สวัสดี, ${currentUser.name}`;
+    if (emailEl) emailEl.textContent = currentUser.email;
 
-        // Fetch user's data
-        await loadData();
-
-        initNavigation();
-        renderCurrentPage();
+    initNavigation();
+    renderCurrentPage();
     }
     
     // NEW: Function to load all user data from Firestore
     async function loadData() {
-        if (!currentUser) return;
-
-        // Load transactions
-        const transQuery = query(collection(db, "users", currentUser.uid, "transactions"), orderBy("date", "desc"));
+    if (!currentUser) return;
+    try {
+        const transQuery = query(
+        collection(db, "users", currentUser.uid, "transactions"),
+        orderBy("date", "desc")
+        );
         const transSnapshot = await getDocs(transQuery);
-        transactions = transSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        transactions = transSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        // Load goals
-        const goalsQuery = query(collection(db, "users", currentUser.uid, "goals"), orderBy("deadline", "asc"));
+        const goalsQuery = query(
+        collection(db, "users", currentUser.uid, "goals"),
+        orderBy("deadline", "asc")
+        );
         const goalsSnapshot = await getDocs(goalsQuery);
-        goals = goalsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        goals = goalsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (err) {
+        console.error('loadData error:', err);
+        // อย่าให้หน้าแตก
+        transactions = transactions || [];
+        goals = goals || [];
+        // โชว์ข้อความแจ้งเตือนผู้ใช้แบบนุ่มๆ
+        const content = document.getElementById('content-area');
+        if (content) {
+        content.innerHTML = `<div class="card"><div class="card-content">
+            <p style="color:#ef4444">โหลดข้อมูลไม่สำเร็จ (${err.code || err.message})</p>
+        </div></div>` + (content.innerHTML || '');
+        }
+    }
     }
 
 
@@ -216,23 +238,24 @@
     }
     
     function showAuthPage() {
-        currentUser = null;
-        transactions = [];
-        goals = [];
-        document.getElementById('auth-page').style.display = 'flex'; // Use flex for centering
-        document.getElementById('main-app').style.display = 'none';
-        initAuthPage();
+    currentUser = null;
+    transactions = [];
+    goals = [];
+    const authPage = document.getElementById('auth-page');
+    const mainApp  = document.getElementById('main-app');
+    if (!authPage || !mainApp) return;
+    authPage.style.display = 'flex';
+    mainApp.style.display  = 'none';
+    initAuthPage(); // ok
     }
     
     // NEW: Firebase Auth State Observer
+   document.addEventListener('DOMContentLoaded', () => {
+    // ตั้ง observer และเริ่มต้นทั้งหมดจากในนี้เท่านั้น
     onAuthStateChanged(auth, (user) => {
-        if (user) {
-            // User is signed in
-            showMainApp(user);
-        } else {
-            // User is signed out
-            showAuthPage();
-        }
+        if (user) showMainApp(user);
+        else showAuthPage();
+    });
     });
 
 
@@ -269,30 +292,33 @@
     
     // MODIFIED: renderCurrentPage to handle async data
     async function renderCurrentPage() {
-        const contentArea = document.getElementById('content-area');
-        
-        // Reload data just in case it's stale
-        await loadData();
-        
-        switch (currentPage) {
-            case 'dashboard':
-                contentArea.innerHTML = renderDashboard();
-                break;
-            case 'transactions':
-                contentArea.innerHTML = renderTransactionsPage();
-                initTransactionsPage();
-                break;
-            case 'goals':
-                contentArea.innerHTML = renderGoalsPage();
-                initGoalsPage();
-                break;
-            case 'progress':
-                contentArea.innerHTML = renderProgressPage();
-                initProgressPage();
-                break;
-            default:
-                contentArea.innerHTML = renderDashboard();
-        }
+    const contentArea = document.getElementById('content-area');
+    if (!contentArea) return;          // กัน null
+
+    // ใส่ loading คร่าวๆ ระหว่าง fetch
+    contentArea.innerHTML = `<div class="py-8 text-center">กำลังโหลด...</div>`;
+
+    await loadData();                  // มี try/catch ข้างบนแล้ว
+
+    switch (currentPage) {
+        case 'dashboard':
+        contentArea.innerHTML = renderDashboard();
+        break;
+        case 'transactions':
+        contentArea.innerHTML = renderTransactionsPage();
+        initTransactionsPage();
+        break;
+        case 'goals':
+        contentArea.innerHTML = renderGoalsPage();
+        initGoalsPage();
+        break;
+        case 'progress':
+        contentArea.innerHTML = renderProgressPage();
+        initProgressPage();
+        break;
+        default:
+        contentArea.innerHTML = renderDashboard();
+    }
     }
 
 
